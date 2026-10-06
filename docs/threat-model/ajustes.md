@@ -10,7 +10,7 @@ El modelo del trabajo 1 (Caso 5, Aplicación Bancaria Móvil, 41 amenazas STRIDE
 | Elemento del DFD (Caso 5) | Implementación en este repositorio | Límite de confianza |
 |---|---|---|
 | App Móvil Bancaria / Cliente | Cualquier consumidor HTTP de la API (navegador, `curl`, otra aplicación) | Fuera del sistema |
-| API Gateway / Servidor API | API Spring Boot 3.5 (`ProductController`, `CommentController`, `AdminController`) en un contenedor publicado solo en `127.0.0.1:8085` | Contenedor en la PC del grupo |
+| API Gateway / Servidor API | API Spring Boot (3.5.14 en la línea base; 4.0.8 con Spring Framework 7.0.9 tras la remediación) (`ProductController`, `CommentController`, `AdminController`) en un contenedor publicado solo en `127.0.0.1:8085` | Contenedor en la PC del grupo |
 | Servicio de Autenticación | `AuthController` + `SecurityConfig` (Spring Security) | Dentro del contenedor |
 | BD Clientes y Credenciales / BD Cuentas y Transacciones | Base H2 en memoria (`schema.sql`, `data.sql`) | Dentro del contenedor |
 | Logs de auditoría | Logs de la aplicación (SLF4J/Logback, salida estándar del contenedor) | Dentro del contenedor |
