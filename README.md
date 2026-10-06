@@ -117,7 +117,15 @@ scripts/desplegar_local.sh <run-id>
 docker compose -f deploy/compose.yml -p pf-g10-webapi down
 ```
 
-Las variables opcionales de la aplicación (usuarios y hashes de contraseña) van en un archivo fuera del repositorio cuya ruta se indica en `APP_ENV_FILE`.
+Las variables de la aplicación van en un archivo fuera del repositorio cuya ruta se indica en `APP_ENV_FILE` (permisos 600). Como Compose interpreta `$` en ese archivo, los hashes bcrypt se escriben entre comillas simples:
+
+```bash
+LAB_ADMIN_PASSWORD_HASH='$2a$10$...'
+LAB_USER_PASSWORD_HASH='$2a$10$...'
+LAB_EXTERNAL_API_KEY='...'
+```
+
+Si un hash falta, ese usuario no se crea y la aplicación arranca igual (solo quedan los endpoints públicos).
 
 ## DefectDojo local
 
@@ -240,20 +248,21 @@ python3 scripts/validar_conftest.py reports/conftest-report.json conftest.err "$
 python3 scripts/gate.py --reports reports --output reports/gate.json
 ```
 
-## Aplicación base
+## Aplicación
 
-API Spring Boot 3.5 (Java 21, Maven, H2 en memoria) del laboratorio, con vulnerabilidades intencionales.
+API Spring Boot 4.0 (Java 21, Maven, H2 en memoria). El proyecto base es deliberadamente vulnerable; las correcciones aplicadas se describen en el pull request de remediación.
 
 ```bash
 mvn clean verify
 mvn spring-boot:run   # http://localhost:8080
 ```
 
-Endpoints:
+| Endpoint | Acceso |
+|---|---|
+| `GET /api/products/search?name=Laptop` | público |
+| `GET /actuator/health` | público |
+| `POST /api/auth/login` | público (valida usuario y contraseña) |
+| `POST /api/comments/preview` | usuario autenticado, con token CSRF |
+| `GET /api/admin/users/{id}` y el resto de `/actuator/**` | rol `ADMIN` |
 
-```text
-GET  /api/products/search?name=Laptop
-POST /api/comments/preview
-GET  /api/admin/users/1
-POST /api/auth/login
-```
+La autenticación es HTTP Basic contra los usuarios `admin` (rol `ADMIN`) y `ana` (rol `USER`), cuyos hashes bcrypt llegan por las variables `LAB_ADMIN_PASSWORD_HASH` y `LAB_USER_PASSWORD_HASH`. Un hash se genera, por ejemplo, con `htpasswd -nbBC 10 "" '<contraseña>' | cut -d: -f2`.
