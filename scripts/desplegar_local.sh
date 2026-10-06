@@ -56,9 +56,11 @@ PY
 verificar_origen() {
   local id="$1" datos evento rama conclusion
   datos="$(gh run view "$id" -R "$REPO" --json event,headBranch,conclusion,headSha \
-    --jq '[.event, .headBranch, .conclusion, .headSha] | @tsv')"
-  IFS=$'\t' read -r evento rama conclusion COMMIT_RUN <<< "$datos"
+    --jq '[.event, .headBranch, .conclusion, .headSha] | join("|")')"
+  # Separador no blanco: con tabuladores, un campo vacío (run en curso) desplazaría los demás.
+  IFS='|' read -r evento rama conclusion COMMIT_RUN <<< "$datos"
   echo "Run $id: evento=$evento, rama=$rama, conclusión=$conclusion, commit=$COMMIT_RUN"
+  [ -n "$conclusion" ] || error "el run $id todavía no terminó (en curso o en cola): no hay imagen aprobada"
   [ "$conclusion" = "success" ] || error "el run $id no terminó en success ($conclusion): no hay imagen aprobada"
   case "$evento" in
     push | workflow_dispatch) ;;
@@ -122,6 +124,9 @@ if [ "$modo" = "verificar" ]; then
   echo "Modo --solo-verificar: no se despliega."
   exit 0
 fi
+
+# En un push a main la etiqueta de la imagen es el commit del run.
+[ "${CARGADA#*:}" = "$COMMIT_RUN" ] || error "la imagen cargada ($CARGADA) no es del commit del run ($COMMIT_RUN)"
 
 # Se usa el compose.yml del commit del run, no el de la copia local del repositorio.
 gh api -H "Accept: application/vnd.github.raw" "repos/$REPO/contents/deploy/compose.yml?ref=$COMMIT_RUN" > "$TMP/compose.yml"

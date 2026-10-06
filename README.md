@@ -121,7 +121,7 @@ Otras opciones:
 Para detener la aplicación:
 
 ```bash
-docker compose -f deploy/compose.yml -p pf-g10-webapi down
+docker compose -p pf-g10-webapi down
 ```
 
 Las variables de la aplicación van en un archivo fuera del repositorio cuya ruta se indica en `APP_ENV_FILE` (permisos 600). Como Compose interpreta `$` en ese archivo, los hashes bcrypt se escriben entre comillas simples:
