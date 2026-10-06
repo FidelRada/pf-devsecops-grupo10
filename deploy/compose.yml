@@ -1,0 +1,22 @@
+# Despliegue local de la API. Solo escucha en 127.0.0.1:8085.
+# IMAGE_TAG es el commit cuya imagen aprobó el quality gate. La imagen llega siempre
+# por "docker load" desde el artifact del run, nunca de un registro (pull_policy: never).
+# APP_ENV_FILE (opcional) apunta a un archivo con las variables de la aplicación que
+# vive fuera del repositorio.
+services:
+  webapi:
+    image: pf-g10-webapi:${IMAGE_TAG:?IMAGE_TAG requerido}
+    pull_policy: never
+    ports:
+      - "127.0.0.1:8085:8080"
+    env_file:
+      - path: "${APP_ENV_FILE:-/dev/null}"
+        required: false
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    restart: unless-stopped

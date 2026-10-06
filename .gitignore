@@ -3,3 +3,9 @@ target/
 *.iml
 .vscode/
 *.log
+
+# Salidas locales del pipeline
+reports/
+conftest.err
+imagen-webapi.tar.gz
+__pycache__/
