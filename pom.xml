@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.14</version>
+        <version>4.0.8</version>
         <relativePath/>
     </parent>
 
@@ -19,12 +19,15 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Versiones mínimas que corrigen CVE HIGH/CRITICAL que el parent aún no incluye. -->
+        <tomcat.version>11.0.25</tomcat.version>
+        <jackson-bom.version>3.1.7</jackson-bom.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -44,21 +47,28 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Dependencia desactualizada agregada solo para el laboratorio SCA. -->
+        <!-- 1.10.0 corrige CVE-2022-42889 (Text4Shell). -->
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
-            <version>1.9</version>
+            <version>1.10.0</version>
+        </dependency>
+
+        <!-- Codificación de salida para HTML (OWASP Java Encoder). -->
+        <dependency>
+            <groupId>org.owasp.encoder</groupId>
+            <artifactId>encoder</artifactId>
+            <version>1.5.0</version>
         </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-test</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -91,7 +101,7 @@
                 <version>11.1.1</version>
                 <configuration>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
-                    <nvdApiKey>05028C6D-2870-4358-A719-5424DDA781B3</nvdApiKey>
+                    <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
                 </configuration>
             </plugin>
             <!-- SpotBugs -->

@@ -16,10 +16,13 @@
 #      ArtifactName del reporte de Trivy.
 #   4. El ID de la imagen cargada debe ser igual a Metadata.ImageID del reporte: así se
 #      despliega exactamente la imagen que se escaneó.
-#   5. docker compose up con esa etiqueta (pull_policy: never).
+#   5. docker compose up con esa etiqueta (pull_policy: never), usando el deploy/compose.yml
+#      del mismo commit del run (descargado de GitHub), no el de la copia local.
 #   6. Comprobación de /actuator/health.
 #
-# Requisitos: gh autenticado, Docker con Compose y python3.
+# Requisitos: gh autenticado, Docker con Compose y python3. Para que la aplicación tenga
+# usuarios, exportar antes APP_ENV_FILE con la ruta del archivo de variables (fuera del
+# repositorio); sin él arranca igual, pero solo con los endpoints públicos.
 
 set -euo pipefail
 
@@ -27,7 +30,6 @@ REPO="FidelRada/pf-devsecops-grupo10"
 IMAGEN="pf-g10-webapi"
 PROYECTO="pf-g10-webapi"
 URL_SALUD="http://127.0.0.1:8085/actuator/health"
-RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 uso() {
   sed -n '4,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -53,10 +55,12 @@ PY
 
 verificar_origen() {
   local id="$1" datos evento rama conclusion
-  datos="$(gh run view "$id" -R "$REPO" --json event,headBranch,conclusion \
-    --jq '[.event, .headBranch, .conclusion] | @tsv')"
-  IFS=$'\t' read -r evento rama conclusion <<< "$datos"
-  echo "Run $id: evento=$evento, rama=$rama, conclusión=$conclusion"
+  datos="$(gh run view "$id" -R "$REPO" --json event,headBranch,conclusion,headSha \
+    --jq '[.event, .headBranch, .conclusion, .headSha] | join("|")')"
+  # Separador no blanco: con tabuladores, un campo vacío (run en curso) desplazaría los demás.
+  IFS='|' read -r evento rama conclusion COMMIT_RUN <<< "$datos"
+  echo "Run $id: evento=$evento, rama=$rama, conclusión=$conclusion, commit=$COMMIT_RUN"
+  [ -n "$conclusion" ] || error "el run $id todavía no terminó (en curso o en cola): no hay imagen aprobada"
   [ "$conclusion" = "success" ] || error "el run $id no terminó en success ($conclusion): no hay imagen aprobada"
   case "$evento" in
     push | workflow_dispatch) ;;
@@ -121,7 +125,17 @@ if [ "$modo" = "verificar" ]; then
   exit 0
 fi
 
-IMAGE_TAG="${CARGADA#*:}" docker compose -f "$RAIZ/deploy/compose.yml" -p "$PROYECTO" up -d --wait --wait-timeout 120
+# En un push a main la etiqueta de la imagen es el commit del run.
+[ "${CARGADA#*:}" = "$COMMIT_RUN" ] || error "la imagen cargada ($CARGADA) no es del commit del run ($COMMIT_RUN)"
+
+# Se usa el compose.yml del commit del run, no el de la copia local del repositorio.
+gh api -H "Accept: application/vnd.github.raw" "repos/$REPO/contents/deploy/compose.yml?ref=$COMMIT_RUN" > "$TMP/compose.yml"
+echo "deploy/compose.yml tomado del commit $COMMIT_RUN"
+if [ -z "${APP_ENV_FILE:-}" ]; then
+  echo "Aviso: APP_ENV_FILE no está definido; la aplicación arrancará sin usuarios (solo endpoints públicos)."
+fi
+
+IMAGE_TAG="${CARGADA#*:}" docker compose -f "$TMP/compose.yml" -p "$PROYECTO" up -d --wait --wait-timeout 120
 
 respuesta="$(curl -fsS --retry 10 --retry-delay 5 --retry-all-errors "$URL_SALUD")"
 echo "$URL_SALUD -> $respuesta"

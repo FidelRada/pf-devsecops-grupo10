@@ -98,9 +98,11 @@ Con el runner encendido, cada push a `main` que aprueba el gate ejecuta el job `
 
 ### Vía manual: desde los artifacts
 
-[`scripts/desplegar_local.sh`](scripts/desplegar_local.sh) hace lo mismo a mano y funciona con el runner apagado:
+[`scripts/desplegar_local.sh`](scripts/desplegar_local.sh) hace lo mismo a mano y funciona con el runner apagado. Se ejecuta desde un clon limpio de `main`, con el archivo de variables de la aplicación exportado (sin él la aplicación arranca, pero sin usuarios):
 
 ```bash
+git clone https://github.com/FidelRada/pf-devsecops-grupo10.git && cd pf-devsecops-grupo10
+export APP_ENV_FILE=/ruta/fuera/del/repositorio/.env.app
 scripts/desplegar_local.sh <run-id>
 ```
 
@@ -108,16 +110,29 @@ scripts/desplegar_local.sh <run-id>
 2. Descarga `imagen-webapi` y `reportes-devsecops` con `gh run download`.
 3. Carga la imagen (`gunzip -c … | docker load`) y exige que la etiqueta cargada sea `pf-g10-webapi:<sha>` y coincida con el `ArtifactName` del reporte de imagen.
 4. Compara el ID de la imagen cargada con `Metadata.ImageID`; si no coincide, se detiene sin desplegar.
-5. Ejecuta `docker compose -f deploy/compose.yml -p pf-g10-webapi up -d --wait`.
+5. Ejecuta `docker compose … -p pf-g10-webapi up -d --wait` con el `deploy/compose.yml` del mismo commit del run (lo descarga de GitHub), no con el de la copia local.
 6. Comprueba `http://127.0.0.1:8085/actuator/health`.
 
-`scripts/desplegar_local.sh --solo-verificar <run-id>` hace los pasos 2 a 4 sin desplegar ni exigir que el run sea de `main` (por ejemplo, para revisar el artifact de un pull request). Para detener la aplicación:
+Otras opciones:
+
+- `scripts/desplegar_local.sh --solo-verificar <run-id>` hace los pasos 2 a 4 sin desplegar ni exigir que el run sea de `main` (por ejemplo, para revisar el artifact de un pull request).
+- `scripts/desplegar_local.sh --verificar-archivos <imagen-webapi.tar.gz> <trivy-image-report.json>` hace solo los pasos 3 y 4 con archivos ya descargados (sirve para probar la comparación sin red).
+
+Para detener la aplicación:
 
 ```bash
-docker compose -f deploy/compose.yml -p pf-g10-webapi down
+docker compose -p pf-g10-webapi down
 ```
 
-Las variables opcionales de la aplicación (usuarios y hashes de contraseña) van en un archivo fuera del repositorio cuya ruta se indica en `APP_ENV_FILE`.
+Las variables de la aplicación van en un archivo fuera del repositorio cuya ruta se indica en `APP_ENV_FILE` (permisos 600). Como Compose interpreta `$` en ese archivo, los hashes bcrypt se escriben entre comillas simples:
+
+```bash
+LAB_ADMIN_PASSWORD_HASH='$2a$10$...'
+LAB_USER_PASSWORD_HASH='$2a$10$...'
+LAB_EXTERNAL_API_KEY='...'
+```
+
+Si un hash falta, ese usuario no se crea y la aplicación arranca igual (solo quedan los endpoints públicos).
 
 ## DefectDojo local
 
@@ -207,6 +222,15 @@ Seguridad del runner (el repositorio es público):
 
 **Riesgo residual:** el usuario que ejecuta el runner pertenece al grupo `docker`, porque los jobs usan Docker. Eso equivale a privilegios de root en la PC: un workflow malicioso que llegara a ejecutarse en el runner podría tomar el control del equipo. Por eso los controles anteriores impiden que código de terceros llegue al runner. Al terminar el proyecto, el runner se elimina con `./config.sh remove`.
 
+Otros riesgos residuales y cómo se controlan:
+
+- **`pull_request` desde un fork:** el workflow conserva `pull_request` porque el check `ci` es obligatorio para fusionar. Un fork podría modificar el workflow para pedir el runner local sin el entorno `cd-local`; ese run solo se ejecutaría si alguien lo aprueba y el runner está encendido. Regla: **nunca se aprueban runs de forks** y el runner solo se enciende durante las ejecuciones de `main`.
+- **`workflow_dispatch` desde una rama propia:** quien tenga permiso de escritura podría crear una rama con un workflow modificado y lanzarlo a mano sobre el runner local (el entorno protege el secreto, pero no el runner). Por eso solo el dueño tiene escritura y los demás integrantes entran como colaboradores con rol **Read** o **Triage**, nunca Write:
+
+  ```bash
+  gh api -X PUT repos/FidelRada/pf-devsecops-grupo10/collaborators/<usuario> -f permission=triage
+  ```
+
 El secreto lo crea el dueño del repositorio, leyendo el valor desde `.env.local` sin mostrarlo y sin salto de línea final:
 
 ```bash
@@ -240,20 +264,21 @@ python3 scripts/validar_conftest.py reports/conftest-report.json conftest.err "$
 python3 scripts/gate.py --reports reports --output reports/gate.json
 ```
 
-## Aplicación base
+## Aplicación
 
-API Spring Boot 3.5 (Java 21, Maven, H2 en memoria) del laboratorio, con vulnerabilidades intencionales.
+API Spring Boot 4.0 (Java 21, Maven, H2 en memoria). El proyecto base es deliberadamente vulnerable; las correcciones aplicadas se describen en el pull request de remediación.
 
 ```bash
 mvn clean verify
 mvn spring-boot:run   # http://localhost:8080
 ```
 
-Endpoints:
+| Endpoint | Acceso |
+|---|---|
+| `GET /api/products/search?name=Laptop` | público |
+| `GET /actuator/health` | público |
+| `POST /api/auth/login` | público (valida usuario y contraseña) |
+| `POST /api/comments/preview` | usuario autenticado, con token CSRF |
+| `GET /api/admin/users/{id}` y el resto de `/actuator/**` | rol `ADMIN` |
 
-```text
-GET  /api/products/search?name=Laptop
-POST /api/comments/preview
-GET  /api/admin/users/1
-POST /api/auth/login
-```
+La autenticación es HTTP Basic contra los usuarios `admin` (rol `ADMIN`) y `ana` (rol `USER`), cuyos hashes bcrypt llegan por las variables `LAB_ADMIN_PASSWORD_HASH` y `LAB_USER_PASSWORD_HASH`. Un hash se genera, por ejemplo, con `htpasswd -nbBC 10 "" '<contraseña>' | cut -d: -f2`.
