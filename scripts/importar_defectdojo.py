@@ -90,6 +90,8 @@ class Configuracion:
             raise ErrorEntrada("falta la variable DEFECTDOJO_URL")
         if not token:
             raise ErrorEntrada("falta la variable DEFECTDOJO_API_KEY")
+        if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+            raise ErrorEntrada("DEFECTDOJO_URL debe empezar con http:// o https://")
         servidor = e.get("GITHUB_SERVER_URL", "https://github.com")
         repo = e.get("GITHUB_REPOSITORY", "")
         return cls(
@@ -175,11 +177,14 @@ class ClienteDefectDojo:
                 with urllib.request.urlopen(pedido, timeout=TIMEOUT) as resp:
                     texto = resp.read().decode("utf-8", errors="replace")
                     try:
-                        return json.loads(texto) if texto.strip() else {}
+                        datos = json.loads(texto) if texto.strip() else {}
                     except json.JSONDecodeError:
                         raise ErrorApi(f"{metodo} {ruta} -> respuesta no JSON (¿DEFECTDOJO_URL correcta?)") from None
+                    if not isinstance(datos, dict):
+                        raise ErrorApi(f"{metodo} {ruta} -> se esperaba un objeto JSON y llegó {type(datos).__name__}")
+                    return datos
             except urllib.error.HTTPError as exc:
-                detalle = exc.read().decode("utf-8", errors="replace")[:500]
+                detalle = exc.read().decode("utf-8", errors="replace").replace(self.config.token, "***")[:500]
                 if exc.code >= 500 and intento < INTENTOS:
                     ultimo = f"HTTP {exc.code}"
                 else:
@@ -488,7 +493,7 @@ def escribir_resumen_markdown(resumen: dict, destino) -> None:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Importa los reportes del pipeline en DefectDojo.")
-    sub = parser.add_subparsers(dest="comando")
+    sub = parser.add_subparsers(dest="comando", required=True)
     p = sub.add_parser("pipeline", help="reimporta los reportes del pipeline")
     p.add_argument("--reports", default="reports", help="carpeta con los reportes JSON")
     p.add_argument("--output", help="JSON de resumen (por defecto reports/defectdojo-<runId>.json)")
