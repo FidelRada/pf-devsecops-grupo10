@@ -99,6 +99,8 @@ def leer_json(ruta: Path):
         return json.loads(texto)
     except json.JSONDecodeError as exc:
         raise ReporteInvalido(f"JSON inválido: {exc}") from exc
+    except RecursionError:
+        raise ReporteInvalido("JSON con un anidamiento excesivo") from None
 
 
 def evaluar_semgrep(datos, herramienta: str) -> list:

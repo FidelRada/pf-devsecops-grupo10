@@ -74,11 +74,13 @@ def validar(texto_json: str, texto_err: str, rc: int, archivo: str = "Dockerfile
     return {"rc": rc, "failures": total_failures, "warnings": total_warnings}
 
 
-def _leer(ruta: str) -> str:
+def _leer(ruta: str, estricto: bool = True) -> str:
     try:
-        return Path(ruta).read_text(encoding="utf-8")
+        return Path(ruta).read_text(encoding="utf-8", errors="strict" if estricto else "replace")
     except FileNotFoundError:
         return ""
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ErrorTecnico(f"no se pudo leer {ruta}: {type(exc).__name__}") from None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -93,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"::error::Código de salida de Conftest inválido: {rc_texto!r}")
         return EXIT_ERROR_TECNICO
 
-    texto_err = _leer(ruta_err)
+    texto_err = _leer(ruta_err, estricto=False)
     try:
         resumen = validar(_leer(ruta_json), texto_err, rc)
     except ErrorTecnico as exc:
