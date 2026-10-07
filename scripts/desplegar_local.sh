@@ -45,10 +45,13 @@ campo_json() {
   # campo_json <archivo> <clave> [<subclave>...]: imprime un valor del JSON.
   python3 - "$@" <<'PY'
 import json, sys
-with open(sys.argv[1], encoding="utf-8") as fh:
-    valor = json.load(fh)
-for clave in sys.argv[2:]:
-    valor = valor[clave]
+try:
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        valor = json.load(fh)
+    for clave in sys.argv[2:]:
+        valor = valor[clave]
+except (OSError, ValueError, KeyError, TypeError) as exc:
+    sys.exit(f"ERROR: no se pudo leer {'.'.join(sys.argv[2:])} de {sys.argv[1]}: {type(exc).__name__}")
 print(valor)
 PY
 }
