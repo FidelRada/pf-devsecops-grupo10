@@ -20,12 +20,12 @@ FROM eclipse-temurin:21.0.12.1_1-jre-alpine-3.24@sha256:51ab5e3302e7141ce665ca3e
 # Security: run as non-root user
 # Alpine no trae groupadd/useradd: se usan addgroup/adduser (BusyBox).
 RUN addgroup -S spring && adduser -S -G spring spring
-USER root
+USER spring:spring
 
 WORKDIR /app
 
 # Copy only the fat jar, owned by the application user
-COPY --from=builder --chown=spring:spring /app/target/*.jar app.jar
+COPY --from=builder /app/target/*.jar app.jar
 
 # Optional: expose actuator / app port
 EXPOSE 8080
