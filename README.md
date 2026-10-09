@@ -282,3 +282,12 @@ mvn spring-boot:run   # http://localhost:8080
 | `GET /api/admin/users/{id}` y el resto de `/actuator/**` | rol `ADMIN` |
 
 La autenticación es HTTP Basic contra los usuarios `admin` (rol `ADMIN`) y `ana` (rol `USER`), cuyos hashes bcrypt llegan por las variables `LAB_ADMIN_PASSWORD_HASH` y `LAB_USER_PASSWORD_HASH`. Un hash se genera, por ejemplo, con `htpasswd -nbBC 10 "" '<contraseña>' | cut -d: -f2`.
+
+## Equipo
+
+| Integrante | Usuario de GitHub |
+|---|---|
+| Bautista Condori Anderzon | `Anderzon-cmd` |
+| Grichukin Méndez Richard | `richardgrim` |
+| Rada Rojas Andrés Fidel | `FidelRada` |
+| Vargas Ríos Bebi | `bbitha` |
