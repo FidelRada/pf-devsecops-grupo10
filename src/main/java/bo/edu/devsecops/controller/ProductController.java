@@ -29,7 +29,6 @@ public class ProductController {
 
     @GetMapping("/exacto")
     public List<Map<String, Object>> exacto(@RequestParam(defaultValue = "") String name) {
-        String sql = "SELECT id, name, price FROM products WHERE name = '" + name + "'";
-        return jdbcTemplate.queryForList(sql);
+        return jdbcTemplate.queryForList("SELECT id, name, price FROM products WHERE name = ?", name);
     }
 }
